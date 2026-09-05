@@ -47,7 +47,13 @@ body {
   font-family: var(--font-sans);
 }
 
-/* Filet fin réutilisable (hairline) plutôt que cartes pleines/ombres — §4. */
-.hairline {
-  border-color: var(--hairline);
+/* Filet fin réutilisable (hairline) plutôt que cartes pleines/ombres — §4.
+ * Dans @layer utilities pour rester au même niveau de cascade que les classes
+ * Tailwind (ex: focus:border-accent) — sans ça, une règle hors-@layer bat
+ * toujours une règle "layered" quelle que soit sa spécificité, et l'accent
+ * bronze au focus ne s'affichait jamais. */
+@layer utilities {
+  .hairline {
+    border-color: var(--hairline);
+  }
 }
