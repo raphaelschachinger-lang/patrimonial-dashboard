@@ -1,26 +1,53 @@
 @import "tailwindcss";
 
+/*
+ * Palette — cahier des charges §4. Light mode par défaut (celui qui s'affiche
+ * sans JS), overrides dark via prefers-color-scheme, et [data-theme] permet un
+ * choix manuel qui l'emporte dans les deux sens.
+ */
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #1d1d1f;
+  --muted: #86868b;
+  --accent: #a86b32;
+  --hairline: #e5e5e5;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --background: #050505;
+    --foreground: #f4f4f4;
+    --muted: #8a8a8a;
+    --accent: #c2884f;
+    --hairline: rgba(255, 255, 255, 0.09);
+  }
+}
+
+:root[data-theme="dark"] {
+  --background: #050505;
+  --foreground: #f4f4f4;
+  --muted: #8a8a8a;
+  --accent: #c2884f;
+  --hairline: rgba(255, 255, 255, 0.09);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-hairline: var(--hairline);
+  --font-sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Helvetica, Arial, sans-serif;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+}
+
+/* Filet fin réutilisable (hairline) plutôt que cartes pleines/ombres — §4. */
+.hairline {
+  border-color: var(--hairline);
 }

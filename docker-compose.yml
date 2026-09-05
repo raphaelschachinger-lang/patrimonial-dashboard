@@ -1,0 +1,43 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-patrimoine}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-patrimoine}
+      POSTGRES_DB: ${POSTGRES_DB:-patrimoine}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-patrimoine}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-patrimoine}:${POSTGRES_PASSWORD:-patrimoine}@db:5432/${POSTGRES_DB:-patrimoine}?schema=public
+      AUTH_USER_EMAIL: ${AUTH_USER_EMAIL}
+      AUTH_PASSWORD_HASH: ${AUTH_PASSWORD_HASH}
+      AUTH_SESSION_SECRET: ${AUTH_SESSION_SECRET}
+    ports:
+      - "3000:3000"
+    # Applique les migrations puis lance le serveur Next.js.
+    command: sh -c "npx prisma migrate deploy && node server.js"
+
+  # V2 (§3) : conteneur cron pour la synchro quotidienne Enable Banking.
+  # sync:
+  #   build: { context: ., dockerfile: Dockerfile.sync }
+  #   depends_on: [db]
+  #   environment: *app-env
+
+volumes:
+  db-data:

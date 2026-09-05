@@ -1,0 +1,167 @@
+// Dashboard patrimonial — schéma de données
+// Voir cahier-des-charges-dashboard-patrimoine.md §6 pour le contexte de chaque modèle.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Utilisateur unique de l'app (mono-utilisateur, pas de multi-compte).
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+}
+
+enum AccountType {
+  BANK
+  BROKER
+  CRYPTO
+  MANUAL
+}
+
+enum AccountCategory {
+  CASH
+  PRIVATE_EQUITY
+  REAL_ESTATE
+  OTHER
+}
+
+/// Un compte patrimonial : bancaire connecté (V2), broker/crypto (V2), ou manuel (immobilier, autre, etc.)
+model Account {
+  id       String @id @default(cuid())
+  name     String
+  institution String?
+  country  String?
+  currency String @default("EUR") // ISO 4217 : EUR, USD, CHF...
+
+  type     AccountType
+  category AccountCategory
+
+  bankConnection   BankConnection? @relation(fields: [bankConnectionId], references: [id])
+  bankConnectionId String?
+
+  // identifiant stable côté Enable Banking (identification_hash), pour retrouver
+  // le compte lors d'une resynchro sans le dupliquer. Vide en attendant §3.
+  externalId String?
+
+  archivedAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  balances     Balance[]
+  transactions Transaction[]
+
+  @@index([category])
+}
+
+enum BankConnectionStatus {
+  ACTIVE
+  EXPIRED
+  ERROR
+}
+
+/// Connexion Enable Banking (§3) — table prête, non utilisée avant l'intégration bancaire.
+model BankConnection {
+  id                   String                @id @default(cuid())
+  bankName             String
+  sessionId            String
+  consentValidUntil    DateTime?
+  status               BankConnectionStatus  @default(ACTIVE)
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  accounts Account[]
+}
+
+enum BalanceSource {
+  SYNC
+  MANUAL
+}
+
+/// Historique de soldes par compte et par date (append-only : chaque saisie/synchro ajoute une ligne).
+model Balance {
+  id        String        @id @default(cuid())
+  account   Account       @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  accountId String
+  date      DateTime      @db.Date
+  amount    Decimal       @db.Decimal(18, 2) // dans la devise du compte
+  source    BalanceSource @default(MANUAL)
+  createdAt DateTime      @default(now())
+
+  @@unique([accountId, date])
+  @@index([accountId, date])
+}
+
+enum TransactionSource {
+  AUTO
+  MANUAL
+}
+
+/// Transactions importées (§5.3, §5.6) — vide pour l'instant, prêt pour la synchro Enable Banking.
+model Transaction {
+  id          String            @id @default(cuid())
+  account     Account           @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  accountId   String
+  date        DateTime          @db.Date
+  amount      Decimal           @db.Decimal(18, 2) // signé : négatif = dépense, positif = crédit
+  label       String
+  category    String?
+  subcategory String?
+  source      TransactionSource @default(AUTO)
+  // une correction manuelle sur une transaction devient définitive et n'est
+  // plus jamais écrasée par une resynchro (§5.6).
+  isManuallyCorrected Boolean @default(false)
+  externalId  String? // identifiant Enable Banking pour dédupliquer à la resynchro
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([accountId, externalId])
+  @@index([accountId, date])
+  @@index([category])
+}
+
+/// Table manuelle de répartition cible par broker/banque (§5.2) — 100% hypothèses utilisateur.
+model AllocationTarget {
+  id                String   @id @default(cuid())
+  broker            String
+  horizon           String // court / moyen / long terme
+  managementType    String // passive / active
+  controlLevel      String
+  strategyName      String
+  amount            Decimal  @db.Decimal(18, 2)
+  percentage        Decimal  @db.Decimal(5, 2)
+  potentialGrowth   Decimal? @db.Decimal(5, 2)
+  drawdown          Decimal? @db.Decimal(5, 2)
+  riskAdjustedReward Decimal? @db.Decimal(5, 2)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+/// Hypothèse de croissance annuelle pour le "million run" (§5.5).
+model ProjectionAssumption {
+  id                 String   @id @default(cuid())
+  label              String
+  annualGrowthRate    Decimal  @db.Decimal(5, 2) // en %, ex 7.00
+  startingBalance     Decimal  @db.Decimal(18, 2)
+  startingDate        DateTime @db.Date
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+/// Taux de change mis en cache (Frankfurter API), 1 appel/jour max.
+model ExchangeRate {
+  id    String   @id @default(cuid())
+  base  String // ex "EUR"
+  quote String // ex "USD"
+  date  DateTime @db.Date
+  rate  Decimal  @db.Decimal(18, 8)
+
+  @@unique([base, quote, date])
+}

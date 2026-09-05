@@ -1,36 +1,55 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Dashboard patrimonial
 
-## Getting Started
+App perso de suivi patrimonial (voir [cahier-des-charges-dashboard-patrimoine.md](./cahier-des-charges-dashboard-patrimoine.md)). Next.js + PostgreSQL/Prisma, auto-hébergeable via Docker.
 
-First, run the development server:
+**État actuel (Phase 1)** : squelette + écran Patrimoine (§5.1) en saisie 100% manuelle. Enable Banking (§3) pas encore branché — le compte n'est pas encore créé côté utilisateur.
+
+## Démarrage rapide (dev local)
+
+Prérequis : Node 20+, un Postgres accessible en local (le plus simple : `docker compose up db` si Docker est installé, sinon une instance Postgres locale/Postgres.app).
 
 ```bash
+cp .env.example .env   # puis éditer les valeurs (voir ci-dessous)
+npm install
+npm run db:migrate     # crée les tables
+npm run db:seed        # crée l'utilisateur unique (AUTH_USER_EMAIL / AUTH_PASSWORD_HASH)
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Ouvrir [http://localhost:3000](http://localhost:3000) — redirige vers `/login`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Générer le mot de passe
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run hash-password -- "mon-mot-de-passe"
+```
 
-## Learn More
+Coller le résultat dans `AUTH_PASSWORD_HASH` (`.env`) tel quel — le script échappe déjà les `$` du hash bcrypt.
 
-To learn more about Next.js, take a look at the following resources:
+> ⚠️ Si vous éditez `AUTH_PASSWORD_HASH` à la main : Next.js fait de l'expansion de
+> variables (`$VAR`) même dans les valeurs entre guillemets d'un `.env`. Un hash bcrypt
+> (`$2b$10$...`) doit donc avoir chacun de ses `$` échappé en `\$`, sinon il est
+> silencieusement tronqué et la connexion échoue sans message d'erreur clair.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Docker Compose (prod / auto-hébergement)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+docker compose up -d --build
+```
 
-## Deploy on Vercel
+Lance Postgres + l'app (migrations appliquées automatiquement au démarrage du conteneur `app`). Variables lues depuis `.env` à la racine.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Scripts utiles
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Commande | Effet |
+|---|---|
+| `npm run dev` | Serveur de dev |
+| `npm run build` / `start` | Build + run production |
+| `npm run db:migrate` | Migration Prisma (dev) |
+| `npm run db:seed` | (Re)crée l'utilisateur unique depuis `.env` |
+| `npm run db:studio` | Prisma Studio (explorer la DB) |
+| `npm run hash-password -- "..."` | Hash bcrypt prêt à coller dans `.env` |
+
+## Roadmap
+
+Voir §7 du cahier des charges. Prochaines étapes : intégration Enable Banking (§3, nécessite un compte control panel côté utilisateur), catégorisation auto des dépenses, Sankey, cashflow, million run.
